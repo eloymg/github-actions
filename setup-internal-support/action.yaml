@@ -1,0 +1,17 @@
+name: Setup Go private repository support
+description: Setup SSH
+inputs:
+  internal-domain:
+    description: “Internal Domain”
+    required: true
+    default: "internal"
+runs:
+  using: "composite"
+  steps:
+    - name: Set GOPRIVATE
+      shell: bash
+      run: |
+        echo "export GOPRIVATE={{inputs.internal-domain}} >> $GITHUB_ENV
+    - name: Configure git for private modules
+      shell: bash
+      run: git config --global url."https://${SPLC_GITHUB_TOKEN}@${{inputs.internal-domain}}".insteadOf "https://{{inputs.internal-domain}}"

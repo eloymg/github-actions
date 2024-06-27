@@ -1,0 +1,22 @@
+name: "Setup Node and CDK"
+description: "Setup Node and CDK"
+inputs:
+  cdk-version:
+    description: “CDK version”
+    required: true
+    default: "latest"
+  node-version:
+    description: “Node version”
+    required: true
+    default: "18"
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-node@v3
+      with:
+        node-version: ${{inputs.node-version}}
+    - name: Install cdk
+      shell: bash
+      run: |
+        npm install cdk@${{inputs.cdk-version}} -g

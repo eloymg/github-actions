@@ -1,0 +1,21 @@
+name: "Lint with golangci-lint"
+description: "Lint using golangci-lint [https://golangci-lint.run/] tool"
+inputs:
+  golangci-version:
+    description: "golangci-lint version"
+    required: true
+    default: "v1.59.1"
+runs:
+  using: "composite" 
+  steps:
+    - name: Lint
+      shell: bash
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${{inputs.golangci-version}}
+        FILE=".golangci.yaml"
+        if [ -f "$FILE" ]; then
+          golangci-lint run ./... --out-format github-actions
+        else
+          echo "Using default configuration"
+          golangci-lint run ./... --out-format github-actions -c $GITHUB_ACTION_PATH/.golangci.yaml
+        fi

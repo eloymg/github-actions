@@ -1,0 +1,39 @@
+name: Go simple workflow
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        required: true
+        type: string
+        default: "1.21"
+jobs:
+  tests:
+    permissions:
+      contents: read
+    runs-on: big
+    strategy:
+      fail-fast: false
+      matrix:
+        testcontext: ["lint", "tests"]
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{inputs.go-version}}
+      - name: Test
+        if: ${{ matrix.testcontext =='tests'}}
+        run: |
+          go test -v ./... -coverprofile coverage.out
+      - name: Lint
+        if: ${{ matrix.testcontext =='lint'}}
+        uses: eloymg/github-actions/lint-go@v0.1
+      - name: Code quality
+        if: ${{ matrix.testcontext =='tests'}}
+        uses: sonarsource/sonarqube-scan-action@v2.2.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+  

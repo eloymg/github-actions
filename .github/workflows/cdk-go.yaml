@@ -1,0 +1,142 @@
+name: CDK Go
+
+on:
+  workflow_call:
+    inputs:
+      role-arn:
+        required: true
+        type: string
+      go-version:
+        required: true
+        type: string
+        default: "1.21"
+      node-version:
+        required: true
+        type: string
+        default: "18"
+      internal-repository-support:
+        type: boolean
+        default: false
+jobs:
+  tests:
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    runs-on: big
+    strategy:
+      fail-fast: false
+      matrix:
+        noxsession: ["lint", "tests","security-checks"]
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v3
+      - name: Set up internal repository support
+        if : ${{ inputs.internal-repository-support }}
+        uses: eloymg/github-actions/actions/setup-internal-support@v0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{inputs.go-version}}
+      - uses: actions/setup-node@v3
+        if: ${{ matrix.noxsession =='tests'}}
+        with:
+          node-version: ${{inputs.node-version}}
+      - name: Test
+        if: ${{ matrix.noxsession =='tests'}}
+        run: |
+          go test -v ./... -coverprofile coverage.out
+      - name: Lint
+        if: ${{ matrix.noxsession =='lint'}}
+        uses: eloymg/github-actions/actions/lint-go@v0.1
+      - name: Code quality
+        if: ${{ matrix.testcontext =='tests'}}
+        uses: sonarsource/sonarqube-scan-action@v2.2.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+      - uses: eloymg/github-actions/actions/setup-cdk@v0.1
+        if: ${{ matrix.noxsession =='security-checks'}}
+        with:
+          node-version: ${{inputs.node-version}}
+      - name: CDK synth
+        if: ${{ matrix.noxsession =='security-checks'}}
+        shell: bash
+        run: |
+          cdk synth
+      - name: Run Lava Action
+        if: ${{ matrix.noxsession =='security-checks'}}
+        uses: adevinta/lava-action@v0
+        with:
+          lava-config: lava.yaml
+          
+  diff:
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    runs-on: big
+    if: github.ref != 'refs/heads/master'
+    steps:
+      - uses: eloymg/github-actions/actions/setup-cdk@v0.1
+        with:
+          node-version: ${{inputs.node-version}}
+      - name: Set up internal repository support
+        if : ${{ inputs.internal-repository-support }}
+        uses: eloymg/github-actions/actions/setup-internal-support@v0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{inputs.go-version}}
+      - name: Login to aws
+        uses: aws-actions/configure-aws-credentials@v4
+        id: aws-login
+        with:
+          role-to-assume: ${{ inputs.role-arn }}
+          aws-region: "eu-west-1"
+          audience: sts.amazonaws.com
+      - name: CDK diff
+        shell: bash
+        run: |
+          OUTPUT=$(cdk diff|tr '$'  ' '|tr '/"' ' ')
+          echo "CDK_DIFF_OUTPUT<<EOF" >> $GITHUB_ENV
+          echo "$OUTPUT" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      - name: Colorize
+        uses: eloymg/github-actions/actions/colorize-cdk-diff@v0.1
+        with:
+          cdk-diff-output: ${{ env.CDK_DIFF_OUTPUT }}
+  deploy:
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: big
+    if: github.ref == 'refs/heads/master'
+    needs: tests
+    steps:
+      - name: Set up internal repository support
+        if : ${{ inputs.internal-repository-support }}
+        uses: eloymg/github-actions/actions/setup-internal-support@v0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{inputs.go-version}}
+      - uses: eloymg/github-actions/actions/setup-cdk@v0.1
+        with:
+          node-version: ${{inputs.node-version}}
+      - name: Login to aws
+        uses: aws-actions/configure-aws-credentials@v4
+        id: aws-login
+        with:
+          role-to-assume: ${{ inputs.role-arn }}
+          aws-region: "eu-west-1"
+          audience: sts.amazonaws.com
+      - name: CDK deploy
+        run: |
+          cdk deploy --all --concurrency 20 --require-approval never
