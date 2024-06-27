@@ -30,7 +30,7 @@ jobs:
         noxsession: ["lint", "tests","security-checks"]
     steps:
       - name: Check out source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up internal repository support
         if : ${{ inputs.internal-repository-support }}
         uses: eloymg/github-actions/actions/setup-internal-support@v0.1
