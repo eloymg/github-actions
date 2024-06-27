@@ -11,16 +11,16 @@ jobs:
   tests:
     permissions:
       contents: read
-    runs-on: big
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         testcontext: ["lint", "tests"]
     steps:
       - name: Check out source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{inputs.go-version}}
       - name: Test

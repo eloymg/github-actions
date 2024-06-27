@@ -8,5 +8,5 @@ jobs:
   tag:
     runs-on: size/small
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: vweevers/additional-tags-action@v2
